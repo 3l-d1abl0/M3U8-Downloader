@@ -9,11 +9,52 @@ import urllib.request
 
 class HlsDownloader(object):
 
-    @staticmethod
-    def getData(output_dir, master_file_name, master_url) -> str:
+    def parseM3U8(self) -> list:
+
+        with open(os.path.join(self.output_dir, self.m3u8_master_file_name), 'r') as file:
+            lines = file.readlines()
+
+        #lines = [line.strip() for line in lines]
+        iterable_obj = iter(lines)
+
+        #list of bandwidth/resolution and source
+        self.source_list = []
+        while True:
+            try:
+                line = next(iterable_obj)
+                line = line.strip().split("BANDWIDTH=")
+                if len(line)==2:
+                    self.source_list.append([line[1].split(",")[0], os.path.join(self.base_url, next(iterable_obj).strip())])
+
+            except StopIteration:
+                break
+
+        if(self.source_list == []):
+            print('No source found in the master file !')
+            return []
+        else:
+
+            print('| Choose a source(s) to Download. Use comma to speerate multiple choices !\n')
+            for idx, ele in enumerate(self.source_list):
+                print("| {} --> BANDWIDTH = {}\n".format(idx, ele[0]))
+
+            option =[]
+            options_list = [i for i in range(len(self.source_list)) ]
+
+            while HlsDownloader.checkOption(option, options_list) is False:
+                option = input("\nEnter your choice : ")
+                option = list( map(int, option.strip().split(",")) )
+
+                if HlsDownloader.checkOption(option, options_list) is False:
+                    print("Incorrect ! Choose the available option ! : ")
+                else:
+                    return option
+
+
+    def getData(self) -> str:
 
         ssl._create_default_https_context = ssl._create_unverified_context
-        site = urllib.request.urlopen(master_url)
+        site = urllib.request.urlopen(self.master_url)
         meta = site.info()
 
         #size in Bytes
@@ -22,9 +63,21 @@ class HlsDownloader(object):
         with site as response:
             data = response.read()
 
-        with open(os.path.join(output_dir, master_file_name), 'wb') as file:
+        with open(os.path.join(self.output_dir, self.m3u8_master_file_name), 'wb') as file:
             file.write(data)
 
+
+        return True
+
+    @staticmethod
+    def checkOption(option, options_list) -> bool:
+
+        if option ==[]:
+            return False
+
+        for op in option:
+            if op not in options_list:
+                return False
 
         return True
 
@@ -66,33 +119,43 @@ class HlsDownloader(object):
     def __init__(self, url):
 
         self.master_url = url
+        '''
+        self.output_dir
+        self.m3u8_master_file_name
+        '''
         print("Init HLS Class")
 
     def process(self) -> bool:
-        baseUrl = os.path.dirname(self.master_url)
+        self.base_url = os.path.dirname(self.master_url)
         self.m3u8_master_file_name = os.path.basename(self.master_url)
 
-        print(baseUrl)
-        print(self.m3u8_master_file_name)
+        #print(self.base_url)
+        #print(self.m3u8_master_file_name)
 
         curPath = os.path.abspath(os.curdir)
         binDir = os.path.join(curPath, self.master_url.split('/')[-2])
 
-        print(curPath)
-        print(binDir)
+        #print(curPath)
+        #print(binDir)
 
         self.output_dir = os.path.join(os.path.abspath(os.curdir), self.master_url.split('/')[-2])
 
         if HlsDownloader.createFolder(self.output_dir) is True:
             print('reading File ... ')
             #read master file
-            master_flag = HlsDownloader.getData(self.output_dir, self.m3u8_master_file_name, self.master_url)
+            master_flag = self.getData()
 
             if master_flag is False:
                 print("ERROR while handling m3u8 file !")
                 exit(-1)
             else:   #process
-                
+                download_options = self.parseM3U8()
+
+                if download_options == []:
+                    print('Exiting !')
+                    exit(-1)
+                else:
+                    print("Processing your option(s) : {}\n".format(download_options))
         else:
             exit(-1)
 
