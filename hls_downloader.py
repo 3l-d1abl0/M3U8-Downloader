@@ -74,7 +74,8 @@ class HlsDownloader(object):
 
     def getSegments(self, option) -> None:
 
-        ssl._create_default_https_context = ssl._create_unverified_context
+        #use when insecure ssl needed
+        #ssl._create_default_https_context = ssl._create_unverified_context
         site = urllib.request.urlopen(self.source_list[option][1])
         meta = site.info()
 
@@ -89,19 +90,23 @@ class HlsDownloader(object):
         with open(os.path.join(self.output_dir, os.path.basename(media_name)), 'wb') as file:
             file.write(data)
 
+        media_ext =''
         with open(os.path.join(self.output_dir, os.path.basename(self.source_list[option][0]))+'.tmp', 'wb') as file:
             for line in data.splitlines():
                 line = line.strip()
 
                 extension = os.path.splitext(line)[1]
+                extension = extension.lower().decode("utf-8").split("?")[0]
 
-                if any(ext in extension.lower().decode("utf-8") for ext in ['.aac','.mp4','.ts']):
+                if any(ext in extension for ext in ['.aac','.mp4','.ts']):
                     media_url = os.path.join(self.base_url, line.decode())
+                    if media_ext == '':
+                        media_ext = extension
                     print('--> ', media_url)
                     with urllib.request.urlopen(media_url) as response:
                                 file.write(response.read())
 
-        os.rename(os.path.join(self.output_dir, os.path.basename(self.source_list[option][0]))+'.tmp', os.path.join(self.output_dir, os.path.basename(self.source_list[option][0]))+str(extension))
+        os.rename(os.path.join(self.output_dir, os.path.basename(self.source_list[option][0]))+'.tmp', os.path.join(self.output_dir, os.path.basename(self.source_list[option][0]))+str(media_ext))
 
     @staticmethod
     def checkOption(option, options_list) -> bool:
@@ -167,14 +172,9 @@ class HlsDownloader(object):
         else:
             self.m3u8_master_file_name = os.path.basename(self.master_url).split('?')[0]
 
-        print('Base : ', self.base_url)
-        print('Master : ',self.m3u8_master_file_name)
-
         curPath = os.path.abspath(os.curdir)
         binDir = os.path.join(curPath, self.master_url.split('/')[-2])
 
-        print(curPath)
-        print(binDir)
 
         self.output_dir = os.path.join(os.path.abspath(os.curdir), self.master_url.split('/')[-2])
 
